@@ -1,0 +1,10 @@
+#ifndef NETAPINAMESPACE_H
+#define NETAPINAMESPACE_H
+
+//命名空间
+#ifndef NETAPI_NAMESPACE_BEGIN
+#define NETAPI_NAMESPACE_BEGIN  namespace NetAPI {
+#define NETAPI_NAMESPACE_END }
+#endif
+
+#endif // NETAPINAMESPACE_H
