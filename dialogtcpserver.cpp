@@ -42,18 +42,22 @@ void DialogTcpServer::slotRead(NetAPI::TcpSessionInfo *sessionInfo, const QByteA
     QDataStream in(data);
     //设置数据流版本
     in.setVersion(QDataStream::Qt_5_9);
-    //判断接收的数据是否有两字节，也就是文件的大小信息，若没有，则返回，继续接收数据
-    if (size < (int)sizeof(qint16)) {
-        return;
+    //首先判断数据大小是否为0，若0，则需要先读文件大小
+    if (blockSize == 0) {
+        //判断接收的数据是否有两字节，也就是文件的大小信息，若没有，则返回，继续接收数据
+        if (size < (int)sizeof(qint16)) {
+            return;
+        }
+        //读取文件的大小信息
+        in >> blockSize;
     }
-    //读取文件的大小信息
-    in >> blockSize;
     //判断接收的数据大小是否达到文件的大小，若无，则返回
     if (size < blockSize) {
         return;
     }
     //读取信息
     in >> message;
+    blockSize = 0; //在读取完毕后，必须将数据大小重置为0，否则下次将无法接收数据
     ui->plainTextEdit->appendPlainText(message);
 
     //----------------- 读数据 end ---------------//
