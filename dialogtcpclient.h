@@ -42,6 +42,7 @@ private:
     Ui::DialogTcpClient *ui;
     NetAPI::TcpClientManager *clientManager;
     NetAPI::TcpSessionInfo *sessionInfo;
+    QByteArray outBlock;  //写数据缓冲区
     QString message;  //网络传输数据
     qint16 blockSize = 0;  //缓冲区大小
 };

@@ -64,8 +64,7 @@ void DialogTcpServer::slotRead(NetAPI::TcpSessionInfo *sessionInfo, const QByteA
 
     //----------------- 写数据 start ---------------//
     //再将内容发回去
-    QByteArray block;
-    QDataStream out(&block, QIODevice::WriteOnly);
+    QDataStream out(&outBlock, QIODevice::WriteOnly);
     //设置版本（客户端和服务端必须保持一致）
     out.setVersion(QDataStream::Qt_5_9);
     //添加一个 qint16 大小的空间，用于后面放置文件的大小信息
@@ -75,11 +74,13 @@ void DialogTcpServer::slotRead(NetAPI::TcpSessionInfo *sessionInfo, const QByteA
     //返回到 block 的开始，加入实际的文件大小信息
     out.device()->seek(0);
     //实际的文件大小
-    qint16 len = (qint16) (block.size() - sizeof(qint16));
+    qint16 len = (qint16) (outBlock.size() - sizeof(qint16));
     //写入文件大小
     out << len;
     //发送
-    sessionInfo->doWrite(block);
+    sessionInfo->doWrite(outBlock);
+    //重置缓冲区
+    outBlock.resize(0);
     //----------------- 写数据 end ---------------//
 }
 
