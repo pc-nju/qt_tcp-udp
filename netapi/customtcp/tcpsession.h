@@ -27,7 +27,7 @@ public:
 
 signals:
     void signalConnect(const QString &host, quint16 port);
-    void signalRead(const QByteArray &data, int size);
+    void signalRead(const QByteArray &data, qint64 size);
     void signalDisConnected(void *);
     void signalDoWrite(const QByteArray &data);
     void signalDoDisConnect();

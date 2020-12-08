@@ -1,6 +1,8 @@
 ﻿#include "dialogtcpclient.h"
 #include "ui_dialogtcpclient.h"
 
+#include <QFileDialog>
+
 DialogTcpClient::DialogTcpClient(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::DialogTcpClient)
@@ -14,6 +16,7 @@ DialogTcpClient::~DialogTcpClient()
     if (this->sessionInfo) {
         disconnect(sessionInfo, &NetAPI::TcpSessionInfo::signalConnect, this, &DialogTcpClient::slotConnect);
         disconnect(sessionInfo, &NetAPI::TcpSessionInfo::signalRead, this, &DialogTcpClient::slotRead);
+        disconnect(sessionInfo, &NetAPI::TcpSessionInfo::signalBytesWritten, this, &DialogTcpClient::slotBytesWritten);
         disconnect(sessionInfo, &NetAPI::TcpSessionInfo::signalDisconnect, this, &DialogTcpClient::slotDisconnect);
         delete this->sessionInfo;
         this->sessionInfo = nullptr;
@@ -23,16 +26,28 @@ DialogTcpClient::~DialogTcpClient()
         delete this->clientManager;
         this->clientManager = nullptr;
     }
+    if (this->localFile) {
+        delete this->localFile;
+        this->localFile = nullptr;
+    }
     delete ui;
 }
 
 void DialogTcpClient::initStyle()
 {
+    totalBytes = 0;
+    bytesWritten = 0;
+    bytesToWrite = 0;
+    payloadSize = 64 * 1024;
+
+    ui->btnSendFile->setEnabled(false);
+
     clientManager = NetAPI::NetApiFactory::createClientManager();
     clientManager->start(1);
     this->sessionInfo = new NetAPI::TcpSessionInfo(clientManager->createClient());
     connect(sessionInfo, &NetAPI::TcpSessionInfo::signalConnect, this, &DialogTcpClient::slotConnect);
     connect(sessionInfo, &NetAPI::TcpSessionInfo::signalRead, this, &DialogTcpClient::slotRead);
+    connect(sessionInfo, &NetAPI::TcpSessionInfo::signalBytesWritten, this, &DialogTcpClient::slotBytesWritten);
     connect(sessionInfo, &NetAPI::TcpSessionInfo::signalDisconnect, this, &DialogTcpClient::slotDisconnect);
 }
 
@@ -46,7 +61,7 @@ void DialogTcpClient::slotConnect()
     writeLog("Connected Success!");
 }
 
-void DialogTcpClient::slotRead(NetAPI::TcpSessionInfo *sessionInfo, const QByteArray &data, int size)
+void DialogTcpClient::slotRead(NetAPI::TcpSessionInfo *sessionInfo, const QByteArray &data, qint64 size)
 {
     Q_UNUSED(sessionInfo);
     //----------------- 读数据 start ---------------//
@@ -71,6 +86,28 @@ void DialogTcpClient::slotRead(NetAPI::TcpSessionInfo *sessionInfo, const QByteA
     blockSize = 0; //在读取完毕后，必须将数据大小重置为0，否则下次将无法接收数据
     ui->plainTextEdit->appendPlainText(message);
     //----------------- 读数据 end ---------------//
+}
+
+void DialogTcpClient::slotBytesWritten(qint64 numBytes)
+{
+    bytesToWrite = totalBytes - numBytes;
+    bytesWritten += numBytes;
+    if (bytesToWrite > 0) {
+        outBlock = localFile->read(qMin(bytesToWrite, payloadSize));
+        this->sessionInfo->doWrite(outBlock);
+        outBlock.resize(0);
+    } else {
+        localFile->close();
+    }
+
+    ui->progressBar->setValue(bytesWritten);
+    //传输完成
+    if (bytesWritten == totalBytes) {
+        //关闭文件
+        localFile->close();
+        //这里可以设置传输完成的相关操作
+        bytesWritten = 0;
+    }
 }
 
 void DialogTcpClient::slotDisconnect()
@@ -122,4 +159,37 @@ void DialogTcpClient::on_btnSend_clicked()
 void DialogTcpClient::on_btnClear_clicked()
 {
     ui->plainTextEdit->clear();
+}
+
+void DialogTcpClient::on_btnSelectFile_clicked()
+{
+    this->fileName = QFileDialog::getOpenFileName(this);
+    if (!fileName.isEmpty()) {
+        ui->btnSendFile->setEnabled(true);
+        ui->leFilePath->setText(fileName);
+    }
+}
+
+void DialogTcpClient::on_btnSendFile_clicked()
+{
+    ui->btnSendFile->setEnabled(false);
+    bytesWritten = 0;
+    localFile = new QFile(fileName);
+    if (!localFile->open(QFile::ReadOnly)) {
+        qDebug() << "client: open file error!";
+        return;
+    }
+    totalBytes = localFile->size();
+    QDataStream out(&outBlock, QIODevice::WriteOnly);
+    out.setVersion(QDataStream::Qt_5_9);
+    QString currentFileName = fileName.right(fileName.size() - fileName.lastIndexOf('/') - 1);
+    //文件总大小、文件名大小、文件名
+    out << qint64(0) << qint64(0) << currentFileName;
+    totalBytes += outBlock.size();
+    ui->progressBar->setMaximum(totalBytes);
+    out.device()->seek(0);
+    //打包数据
+    out << totalBytes << qint64(outBlock.size() - sizeof(qint64)*2);
+    this->sessionInfo->doWrite(outBlock);
+    outBlock.resize(0);
 }

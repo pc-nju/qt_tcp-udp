@@ -14,7 +14,8 @@ class TcpSessionInfo : public QObject
     Q_OBJECT
 
 signals:
-    void signalRead(TcpSessionInfo *, const QByteArray &, int);
+    void signalRead(TcpSessionInfo *, const QByteArray &, qint64);
+    void signalBytesWritten(qint64 numBytes);
     void signalConnect();
     void signalDisconnect();
 
@@ -32,7 +33,8 @@ public:
     std::function<void(void*)> onDisConnected = nullptr;
 
 private slots:
-    void slotRead(const QByteArray &data, int size);
+    void slotRead(const QByteArray &data, qint64 size);
+    void slotBytesWritten(qint64 numBytes);  //tcpsocket写入时，触发
     void slotDisconnected();
 
 private:

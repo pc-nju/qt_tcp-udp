@@ -7,6 +7,7 @@ TcpSessionInfo::TcpSessionInfo(std::shared_ptr<TcpSession> session)
     this->session = session;
     connect(this->session.get(), &TcpSession::connected, this, &TcpSessionInfo::signalConnect);
     connect(this->session.get(), &TcpSession::signalRead, this, &TcpSessionInfo::slotRead);
+    connect(this->session.get(), &TcpSession::bytesWritten, this, &TcpSessionInfo::slotBytesWritten);
     connect(this->session.get(), &TcpSession::disconnected, this, &TcpSessionInfo::slotDisconnected);
 }
 
@@ -17,6 +18,7 @@ TcpSessionInfo::~TcpSessionInfo()
     }
     disconnect(this->session.get(), &TcpSession::connected, this, &TcpSessionInfo::signalConnect);
     disconnect(this->session.get(), &TcpSession::signalRead, this, &TcpSessionInfo::slotRead);
+    disconnect(this->session.get(), &TcpSession::bytesWritten, this, &TcpSessionInfo::slotBytesWritten);
     disconnect(this->session.get(), &TcpSession::disconnected, this, &TcpSessionInfo::slotDisconnected);
     this->session = nullptr;
 }
@@ -42,9 +44,14 @@ void TcpSessionInfo::doWrite(const QByteArray &data)
     }
 }
 
-void TcpSessionInfo::slotRead(const QByteArray &data, int size)
+void TcpSessionInfo::slotRead(const QByteArray &data, qint64 size)
 {
     emit this->signalRead(this, data, size);
+}
+
+void TcpSessionInfo::slotBytesWritten(qint64 numBytes)
+{
+    emit this->signalBytesWritten(numBytes);
 }
 
 void TcpSessionInfo::slotDisconnected()
